@@ -494,7 +494,20 @@ h1 {
   }
 }
 
-.expiry-warning {
+.label-locator-qr {
+  margin-top: 4px;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.label-locator-qr canvas,
+.label-locator-qr img {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  image-rendering: pixelated;
+}
   min-height: 1.05em;
   margin-top: -2px;
   color: #ef4444;
@@ -614,6 +627,12 @@ h1 {
     top: 0.03in;
     letter-spacing: 0.02em;
     text-align: right;
+  }
+
+  .label-locator-qr {
+    width: 0.44in;
+    height: 0.44in;
+    margin-top: 2px;
   }
 
   .credit {

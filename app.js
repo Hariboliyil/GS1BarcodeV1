@@ -40,6 +40,7 @@ const el = {
   expiryView: document.getElementById('expiryView'),
   gtinView: document.getElementById('gtinView'),
   locatorView: document.getElementById('locatorView'),
+  locatorQr: document.getElementById('locatorQr'),
   timestampView: document.getElementById('timestampView'),
   expiryWarning: document.getElementById('expiryWarning'),
   labelPreview: document.getElementById('labelPreview'),
@@ -235,7 +236,28 @@ function buildBarcodePayload() {
   return `01${gtin}17${expiry}10${batch}`;
 }
 
-function renderBarcode() {
+let _qrInstance = null;
+
+function renderLocatorQr() {
+  const locator = text(state.form.locator);
+  el.locatorQr.innerHTML = '';
+  _qrInstance = null;
+  if (!locator) return;
+  try {
+    _qrInstance = new QRCode(el.locatorQr, {
+      text: locator,
+      width: 104,
+      height: 104,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  } catch (e) {
+    console.warn('QR render failed', e);
+  }
+}
+
+
   const payload = buildBarcodePayload();
   el.barcodeTextView.textContent = payload || 'Enter product code, batch number, and expiry date';
   if (!payload) {
@@ -274,6 +296,7 @@ function renderLabel() {
   updateFormViews();
   fitDescription();
   renderExpiryWarning();
+  renderLocatorQr();
   renderBarcode();
 }
 
@@ -294,26 +317,58 @@ function clearForm() {
 }
 
 function loadWorkbook(file) {
+  if (!file) return;
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['xlsx', 'xlsm', 'xls'].includes(ext)) {
+    alert(`Unsupported file type ".${ext}". Please upload an Excel file (.xlsx, .xlsm, or .xls).`);
+    return;
+  }
+
+  el.sourceStatus.textContent = `Loading "${file.name}"…`;
+  el.recordCount.textContent = 'Reading…';
+  setStatus('Reading workbook…');
+
   const reader = new FileReader();
-  reader.onload = () => {
+
+  reader.onload = (e) => {
     try {
-      const workbook = XLSX.read(new Uint8Array(reader.result), { type: 'array', cellDates: true });
+      const data = e.target.result;
+      if (!data || data.byteLength === 0) throw new Error('File is empty or could not be read.');
+      const workbook = XLSX.read(new Uint8Array(data), { type: 'array', cellDates: true });
+
+      const sheetNames = workbook.SheetNames;
+      if (!sheetNames.includes('Master')) {
+        throw new Error(`Sheet "Master" not found. Available sheets: ${sheetNames.join(', ')}`);
+      }
+
       state.workbookName = file.name;
       state.master = readSheet(workbook, 'Master');
       state.stock = readSheet(workbook, 'Tbl_StockList');
       buildIndex();
+
       el.sourceStatus.textContent = file.name;
       el.recordCount.textContent = `${state.master.length.toLocaleString()} products`;
       clearForm();
-      setStatus('Workbook loaded');
+      setStatus(`Workbook loaded — ${state.master.length.toLocaleString()} products`);
     } catch (error) {
       console.error(error);
-      el.sourceStatus.textContent = 'Workbook load failed';
+      el.sourceStatus.textContent = 'Load failed — see status for details';
       el.recordCount.textContent = 'No data';
-      setStatus('Workbook load failed');
-      alert(`Could not read the workbook: ${error.message || error}`);
+      setStatus(`Error: ${error.message || error}`);
+      alert(`Could not read the workbook:\n\n${error.message || error}`);
     }
   };
+
+  reader.onerror = () => {
+    const msg = reader.error ? reader.error.message : 'Unknown file read error';
+    console.error('FileReader error:', reader.error);
+    el.sourceStatus.textContent = 'File read failed';
+    el.recordCount.textContent = 'No data';
+    setStatus('File read error: ' + msg);
+    alert('Could not read the file:\n\n' + msg);
+  };
+
   reader.readAsArrayBuffer(file);
 }
 
@@ -329,6 +384,7 @@ function applyProductLookup(productCode) {
     state.form.locator = '';
     updateFormViews();
     fitDescription();
+    renderLocatorQr();
     renderBarcode();
     setStatus('Product code not found in workbook');
     return;
@@ -343,6 +399,7 @@ function applyProductLookup(productCode) {
   state.form.locator = derived.locator || '';
   updateFormViews();
   fitDescription();
+  renderLocatorQr();
   renderBarcode();
   setStatus(`Loaded ${derived.productCode}`);
 }
@@ -376,10 +433,34 @@ function printLabel() {
 }
 
 function wireEvents() {
+  // File input change
   el.workbookFile.addEventListener('change', () => {
-    const file = el.workbookFile.files?.[0];
+    const file = el.workbookFile.files && el.workbookFile.files[0];
     if (file) loadWorkbook(file);
+    // Reset so the same file can be re-uploaded if needed
+    el.workbookFile.value = '';
   });
+
+  // Drag-and-drop on the upload button label
+  const uploadLabel = el.workbookFile.closest('label') || el.workbookFile.parentElement;
+  if (uploadLabel) {
+    uploadLabel.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadLabel.style.borderColor = 'rgba(45,212,191,0.7)';
+      uploadLabel.style.background = 'rgba(45,212,191,0.18)';
+    });
+    uploadLabel.addEventListener('dragleave', () => {
+      uploadLabel.style.borderColor = '';
+      uploadLabel.style.background = '';
+    });
+    uploadLabel.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadLabel.style.borderColor = '';
+      uploadLabel.style.background = '';
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) loadWorkbook(file);
+    });
+  }
 
   el.productCode.addEventListener('input', () => {
     state.form.productCode = el.productCode.value.trim();

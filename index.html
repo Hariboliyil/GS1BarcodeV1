@@ -12,6 +12,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/bwip-js/4.7.0/bwip-js-min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
   <div class="shell">
@@ -42,7 +43,7 @@
         <div class="upload-row">
           <label class="upload-button">
             <input id="workbookFile" type="file" accept=".xlsx,.xlsm,.xls" />
-            <span>Import Excel workbook</span>
+            <span>📂 Import Excel workbook — or drag &amp; drop here</span>
           </label>
         </div>
 
@@ -98,6 +99,7 @@
               <div class="label-right-bottom">
                 <div id="gtinView" class="label-small"></div>
                 <div id="locatorView" class="label-small"></div>
+                <div id="locatorQr" class="label-locator-qr"></div>
               </div>
             </div>
           </div>
