@@ -317,58 +317,26 @@ function clearForm() {
 }
 
 function loadWorkbook(file) {
-  if (!file) return;
-
-  const ext = file.name.split('.').pop().toLowerCase();
-  if (!['xlsx', 'xlsm', 'xls'].includes(ext)) {
-    alert(`Unsupported file type ".${ext}". Please upload an Excel file (.xlsx, .xlsm, or .xls).`);
-    return;
-  }
-
-  el.sourceStatus.textContent = `Loading "${file.name}"…`;
-  el.recordCount.textContent = 'Reading…';
-  setStatus('Reading workbook…');
-
   const reader = new FileReader();
-
-  reader.onload = (e) => {
+  reader.onload = () => {
     try {
-      const data = e.target.result;
-      if (!data || data.byteLength === 0) throw new Error('File is empty or could not be read.');
-      const workbook = XLSX.read(new Uint8Array(data), { type: 'array', cellDates: true });
-
-      const sheetNames = workbook.SheetNames;
-      if (!sheetNames.includes('Master')) {
-        throw new Error(`Sheet "Master" not found. Available sheets: ${sheetNames.join(', ')}`);
-      }
-
+      const workbook = XLSX.read(new Uint8Array(reader.result), { type: 'array', cellDates: true });
       state.workbookName = file.name;
       state.master = readSheet(workbook, 'Master');
       state.stock = readSheet(workbook, 'Tbl_StockList');
       buildIndex();
-
       el.sourceStatus.textContent = file.name;
       el.recordCount.textContent = `${state.master.length.toLocaleString()} products`;
       clearForm();
-      setStatus(`Workbook loaded — ${state.master.length.toLocaleString()} products`);
+      setStatus('Workbook loaded');
     } catch (error) {
       console.error(error);
-      el.sourceStatus.textContent = 'Load failed — see status for details';
+      el.sourceStatus.textContent = 'Workbook load failed';
       el.recordCount.textContent = 'No data';
-      setStatus(`Error: ${error.message || error}`);
-      alert(`Could not read the workbook:\n\n${error.message || error}`);
+      setStatus('Workbook load failed');
+      alert(`Could not read the workbook: ${error.message || error}`);
     }
   };
-
-  reader.onerror = () => {
-    const msg = reader.error ? reader.error.message : 'Unknown file read error';
-    console.error('FileReader error:', reader.error);
-    el.sourceStatus.textContent = 'File read failed';
-    el.recordCount.textContent = 'No data';
-    setStatus('File read error: ' + msg);
-    alert('Could not read the file:\n\n' + msg);
-  };
-
   reader.readAsArrayBuffer(file);
 }
 
@@ -433,34 +401,10 @@ function printLabel() {
 }
 
 function wireEvents() {
-  // File input change
   el.workbookFile.addEventListener('change', () => {
-    const file = el.workbookFile.files && el.workbookFile.files[0];
+    const file = el.workbookFile.files?.[0];
     if (file) loadWorkbook(file);
-    // Reset so the same file can be re-uploaded if needed
-    el.workbookFile.value = '';
   });
-
-  // Drag-and-drop on the upload button label
-  const uploadLabel = el.workbookFile.closest('label') || el.workbookFile.parentElement;
-  if (uploadLabel) {
-    uploadLabel.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      uploadLabel.style.borderColor = 'rgba(45,212,191,0.7)';
-      uploadLabel.style.background = 'rgba(45,212,191,0.18)';
-    });
-    uploadLabel.addEventListener('dragleave', () => {
-      uploadLabel.style.borderColor = '';
-      uploadLabel.style.background = '';
-    });
-    uploadLabel.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadLabel.style.borderColor = '';
-      uploadLabel.style.background = '';
-      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (file) loadWorkbook(file);
-    });
-  }
 
   el.productCode.addEventListener('input', () => {
     state.form.productCode = el.productCode.value.trim();
